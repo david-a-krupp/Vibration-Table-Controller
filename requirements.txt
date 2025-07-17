@@ -1,0 +1,6 @@
+numpy
+scipy
+mcculw
+PyQt5
+RPi.GPIO
+matplotlib
