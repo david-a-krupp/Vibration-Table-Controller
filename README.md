@@ -83,7 +83,7 @@ Python modules used in the controller:
 - `adc.py` – Reads feedback via ADS1115 over I²C  
 - `safety.py` – Monitors GPIO for E-stop trigger  
 - `logging.py` – Saves data to CSV, logs FFT and waveform data  
-- `gui.py` – PyQt5 GUI for touchscreen control  
+- `gui.py` – PyQt5 GUI for touchscreen control
 
 ---
 
@@ -93,7 +93,8 @@ Python modules used in the controller:
 - `mcculw` – MCC USB DAC support  
 - `RPi.GPIO` – Raspberry Pi GPIO access  
 - `matplotlib` – Live graphing and FFT plotting  
-- `psutil` – Detecting USB mount states for file export  
+- `psutil` – Detecting USB mount states for file export
+- `PyQt5` – For touchscreen control
 
 ---
 
