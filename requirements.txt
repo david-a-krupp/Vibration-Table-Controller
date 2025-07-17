@@ -1,6 +1,0 @@
-numpy
-scipy
-matplotlib
-psutil
-mcculw
-RPi.GPIO
