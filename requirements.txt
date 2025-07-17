@@ -4,3 +4,4 @@ matplotlib
 psutil
 mcculw
 RPi.GPIO
+PyQt5
