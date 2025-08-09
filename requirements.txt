@@ -1,0 +1,7 @@
+uldaq>=1.2.0
+gpiozero>=2.0.1
+adafruit-circuitpython-ads1x15>=2.2.23
+pyqtgraph>=0.13.7
+numpy>=1.26
+scipy>=1.12
+PyQt5>=5.15
