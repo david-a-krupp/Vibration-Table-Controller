@@ -1,15 +1,14 @@
 [Unit]
-Description=Vibration Table Controller UI
+Description=Vibration Table Controller
 After=network-online.target
-Wants=network-online.target
 
 [Service]
 Type=simple
-User=pi
 WorkingDirectory=/opt/vtc
-Environment=PYTHONUNBUFFERED=1
 ExecStart=/usr/bin/python3 /opt/vtc/app.py
 Restart=on-failure
+RestartSec=2
 
 [Install]
 WantedBy=multi-user.target
+
