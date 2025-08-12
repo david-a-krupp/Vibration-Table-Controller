@@ -26,13 +26,15 @@ python3 app.py
 
 ## Autostart (systemd)
 ```bash
+# install location for the app
 sudo mkdir -p /opt/vtc
-sudo cp -r vtc/*.py /opt/vtc/
-sudo cp app.py /opt/vtc/
-sudo cp services/vibration_controller.service /etc/systemd/system/
+sudo cp *.py /opt/vtc/
+sudo cp vibration-controller.service /etc/systemd/system/
+
+# enable service
 sudo systemctl daemon-reload
-sudo systemctl enable vibration_controller
-sudo systemctl start vibration_controller
+sudo systemctl enable vibration-controller
+sudo systemctl start vibration-controller
 ```
 
 ## USB export
