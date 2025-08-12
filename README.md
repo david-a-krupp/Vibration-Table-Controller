@@ -15,7 +15,7 @@ Includes an optional ±10 V line driver for amplifiers that require bipolar driv
 ## Install
 ```bash
 sudo apt update
-sudo apt install -y python3-pip python3-gpiozero python3-pyqt5
+sudo apt install -y python3-pip python3-gpiozero python3-pyqt5 libuldaq
 pip3 install -r requirements.txt
 ```
 
@@ -29,10 +29,10 @@ python3 app.py
 sudo mkdir -p /opt/vtc
 sudo cp -r vtc/*.py /opt/vtc/
 sudo cp app.py /opt/vtc/
-sudo cp services/vibration-controller.service /etc/systemd/system/
+sudo cp services/vibration_controller.service /etc/systemd/system/
 sudo systemctl daemon-reload
-sudo systemctl enable vibration-controller
-sudo systemctl start vibration-controller
+sudo systemctl enable vibration_controller
+sudo systemctl start vibration_controller
 ```
 
 ## USB export
@@ -43,6 +43,8 @@ sudo systemctl start vibration-controller
 - MCC USB-1208FS-Plus provides 0–5 V AO. Use the included line driver design if ±10 V is required.
 - Use a 5 V opto-isolated relay for mute. Default state is MUTED (LOW).
 - Protect the ADS1115 with divider + RC + series resistor. Consider differential mode.
+- E-stop switch should be wired to a dedicated GPIO input and monitored in software (gpio.py).
 
 ## Calibration
-Adjust values in `vtc/config.py` or via the Settings panel (future option). Use the Loopback Cal routine to compute effective scale.
+Adjust values in vtc/config.py.
+Use the Loopback Calibration routine to compute effective gain/scale for your DAC/ADC chain.
