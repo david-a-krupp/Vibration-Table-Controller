@@ -26,12 +26,9 @@ python3 app.py
 
 ## Autostart (systemd)
 ```bash
-# install location for the app
 sudo mkdir -p /opt/vtc
 sudo cp *.py /opt/vtc/
 sudo cp vibration-controller.service /etc/systemd/system/
-
-# enable service
 sudo systemctl daemon-reload
 sudo systemctl enable vibration-controller
 sudo systemctl start vibration-controller
