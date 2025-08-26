@@ -47,7 +47,7 @@ class VTCApp:
         layout.setHorizontalSpacing(12)
         layout.setVerticalSpacing(8)
 
-        # Controls
+        # Buttons/Controls
         self.modeBox = QtWidgets.QComboBox()
         self.modeBox.addItems(["Manual", "Sine", "SineSweep", "Random", "SoR", "Dwell", "Shock"])
         self.armBtn = QtWidgets.QPushButton("ARM")
@@ -93,7 +93,7 @@ class VTCApp:
         self.ycmd  = []
         self.ymeas = []
 
-        # Start in windowed; allow user to toggle full-screen for 7" touch
+        # Starts windowed, user has to toggle full-screen for 7" touch
         self.win.show()
 
     def _toggle_fullscreen(self, state):
