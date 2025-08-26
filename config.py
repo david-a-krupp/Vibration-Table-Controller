@@ -11,7 +11,7 @@ class Calibration:
 @dataclass
 class GPIOPins:
     ESTOP_PIN: int = 17
-    MUTE_PIN: int  = 27
+    MUTE_PIN: int  = 18
 
 @dataclass
 class Runtime:
