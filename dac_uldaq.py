@@ -7,7 +7,7 @@ class DacULDAQ:
         self.channel = channel
         devices = get_daq_device_inventory(InterfaceType.USB)
         if not devices:
-            raise RuntimeError("No MCC USB DAQ devices found.")
+            raise RuntimeError("MCC DAQ not found")
         if device_hint:
             matches = [d for d in devices if device_hint in d.product_name]
             dd = matches[0] if matches else devices[0]
