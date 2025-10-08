@@ -1,5 +1,6 @@
 # vtc/config.py
 from dataclasses import dataclass
+from pathlib import Path
 
 @dataclass
 class Calibration:
@@ -15,5 +16,5 @@ class GPIOPins:
 
 @dataclass
 class Runtime:
-    SAMPLE_HZ: int   = 500    # UI update cadence for reading ADC
-    LOG_PATH: str    = "/home/pi/vtc_logs"
+    SAMPLE_HZ: int = 500
+    LOG_PATH: str = str((Path.home() / "vtc_logs"))
