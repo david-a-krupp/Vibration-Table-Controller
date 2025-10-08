@@ -8,7 +8,7 @@ Includes an optional ±10 V line driver for amplifiers that need bipolar drive.
 - Safety state machine (INIT, MUTED, ARMED, RUNNING; faults, MUTED)
 - Real-time plots using PyQtGraph
 - CSV logging with metadata
-- **Manual USB export** of current run logs and a snapshot plot
+- **Manual USB export** of current run logs and a SS of the plot
 - Touch UI scaling, full-screen toggle for 7" Raspberry Pi display
 - Autostart using systemd
 
@@ -35,8 +35,8 @@ sudo systemctl start vibration-controller
 ```
 
 ## USB export
-- Plug in a USB stick. It should auto-mount under `/media/pi/<label>` (Bookworm default). 
-- Press **Export** in the UI, select your mount, and the app will copy the current CSV log and a PNG plot snapshot.
+- Plug in a USB stick. It should auto-mount under `/media/pi/<label>` 
+- Press **Export** in the UI, select your mount, and the app should copy the current CSV log and a PNG plot SS.
 
 ## Hardware notes
 - MCC USB-1208FS-Plus provides 0–5 V AO. Use the included line driver design if ±10 V is required.
