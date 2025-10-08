@@ -3,7 +3,7 @@ from gpiozero import Button, OutputDevice
 import time
 
 class SafetyController:
-    def __init__(self, estop_pin=17, mute_pin=27, debounce_s=0.02):
+    def __init__(self, estop_pin=17, mute_pin=18, debounce_s=0.02):
         # E-stop: NC -> GND with internal pull-up; open = fault
         self.estop = Button(estop_pin, pull_up=True, bounce_time=debounce_s)
         # Mute relay: LOW=mute, HIGH=armed
