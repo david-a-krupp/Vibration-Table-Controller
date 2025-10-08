@@ -1,15 +1,15 @@
-# Vibration Table Controller (Raspberry Pi 5)
+# Vibration Table Controller (Raspberry Pi 4)
 
-A complete rewrite aligned to Raspberry Pi OS Bookworm, MCC UL for Linux (uldaq), gpiozero, and a fail-safe E-stop + mute relay.
-Includes an optional ±10 V line driver for amplifiers that require bipolar drive.
+System aligned to Raspberry Pi OS, MCC UL for Linux (uldaq), and gpiozero.
+Includes an optional ±10 V line driver for amplifiers that need bipolar drive.
 
 ## Features
 - Control modes: Manual, Sine Sweep, Random, Sine-on-Random (SoR), Resonance Dwell, Shock
-- Safety state machine (INIT → MUTED → ARMED → RUNNING; faults → MUTED)
+- Safety state machine (INIT, MUTED, ARMED, RUNNING; faults, MUTED)
 - Real-time plots using PyQtGraph
 - CSV logging with metadata
 - **Manual USB export** of current run logs and a snapshot plot
-- Touch-friendly UI scaling, full-screen toggle for 7" Raspberry Pi display
+- Touch UI scaling, full-screen toggle for 7" Raspberry Pi display
 - Autostart using systemd
 
 ## Install
