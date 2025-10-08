@@ -1,6 +1,6 @@
 # app.py - entry point (sets touch-friendly attributes and launches UI)
 from PyQt5 import QtWidgets, QtCore
-from vtc.ui import VTCApp
+from ui import VTCApp
 import sys
 
 if __name__ == "__main__":
