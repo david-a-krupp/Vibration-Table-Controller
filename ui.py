@@ -2,7 +2,6 @@
 import sys, time, os
 from PyQt5 import QtWidgets, QtCore, QtGui
 import pyqtgraph as pg
-
 from .config import Calibration, GPIOPins, Runtime
 from .dac_uldaq import DacULDAQ
 from .adc_ads1115 import ADSReader
@@ -16,7 +15,7 @@ class VTCApp:
         self.app = QtWidgets.QApplication(sys.argv)
         self.app.setStyle("Fusion")
 
-        # Touch-friendly font scaling for 7" display
+        # Touch font scaling for 7" display
         f = self.app.font()
         f.setPointSize(12)
         self.app.setFont(f)
@@ -47,7 +46,7 @@ class VTCApp:
         layout.setHorizontalSpacing(12)
         layout.setVerticalSpacing(8)
 
-        # Buttons/Controls
+        # Controls
         self.modeBox = QtWidgets.QComboBox()
         self.modeBox.addItems(["Manual", "Sine", "SineSweep", "Random", "SoR", "Dwell", "Shock"])
         self.armBtn = QtWidgets.QPushButton("ARM")
@@ -92,8 +91,6 @@ class VTCApp:
         self.xdata = []
         self.ycmd  = []
         self.ymeas = []
-
-        # Starts windowed, user has to toggle full-screen for 7" touch
         self.win.show()
 
     def _toggle_fullscreen(self, state):
@@ -144,7 +141,7 @@ class VTCApp:
         dest, ok = QtWidgets.QInputDialog.getItem(self.win, "USB Export", "Choose destination mount:", mounts, 0, False)
         if not ok or not dest:
             return
-        # Prepare files: current CSV and a snapshot
+        # Prep files: current CSV and a SS
         png_path = os.path.splitext(self.logger.path)[0] + ".png"
         try:
             # Lazy import to avoid hard dependency until needed
