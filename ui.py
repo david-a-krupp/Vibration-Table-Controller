@@ -2,13 +2,14 @@
 import sys, time, os
 from PyQt5 import QtWidgets, QtCore, QtGui
 import pyqtgraph as pg
-from .config import Calibration, GPIOPins, Runtime
-from .dac_uldaq import DacULDAQ
-from .adc_ads1115 import ADSReader
-from .safety_gpio import SafetyController
-from . import waveform as wf
-from .logging_utils import CSVLogger
-from .export_utils import list_usb_mounts, export_files
+
+from config import Calibration, GPIOPins, Runtime
+from dac_uldaq import DacULDAQ
+from adc_ads1115 import ADSReader
+from safety_gpio import SafetyController
+import waveform as wf
+from logging_utils import CSVLogger
+from export_utils import list_usb_mounts, export_files
 
 class VTCApp:
     def __init__(self):
