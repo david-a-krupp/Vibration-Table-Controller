@@ -149,7 +149,7 @@ class VTCApp:
 
         self.lbl_freq = QtWidgets.QLabel("Frequency (Hz):")
         self.spin_freq = QtWidgets.QDoubleSpinBox()
-        self.spin_freq.setRange(0.01, 200.0)
+        self.spin_freq.setRange(0.01, 50.0)
         self.spin_freq.setSingleStep(0.1)
         self.spin_freq.setValue(10.0)
 
@@ -172,13 +172,13 @@ class VTCApp:
         # Sweep-specific
         self.lbl_fstart = QtWidgets.QLabel("Sweep f_start (Hz):")
         self.spin_fstart = QtWidgets.QDoubleSpinBox()
-        self.spin_fstart.setRange(0.01, 200.0)
+        self.spin_fstart.setRange(0.01, 50.0)
         self.spin_fstart.setSingleStep(0.1)
         self.spin_fstart.setValue(0.5)
 
         self.lbl_fend = QtWidgets.QLabel("Sweep f_end (Hz):")
         self.spin_fend = QtWidgets.QDoubleSpinBox()
-        self.spin_fend.setRange(0.01, 200.0)
+        self.spin_fend.setRange(0.01, 50.0)
         self.spin_fend.setSingleStep(0.1)
         self.spin_fend.setValue(50.0)
 
