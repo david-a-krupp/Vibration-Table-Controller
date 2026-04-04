@@ -1,7 +1,5 @@
 # Vibration Table Controller (Raspberry Pi 4)
 
-System aligned to Raspberry Pi OS, MCC UL for Linux (uldaq), and gpiozero.
-
 ## Features
 - Control modes: Manual, Sine Sweep, Random, Sine-on-Random (SoR), Resonance Dwell, Shock
 - Safety state machine (INIT, MUTED, ARMED, RUNNING; faults, MUTED)
@@ -11,16 +9,11 @@ System aligned to Raspberry Pi OS, MCC UL for Linux (uldaq), and gpiozero.
 - Touch UI scaling, full-screen toggle for 7" Raspberry Pi display
 - Autostart using systemd
 
-## Install
-```bash
-sudo apt update
-sudo apt install -y python3-pip python3-gpiozero python3-pyqt5 libuldaq
-pip3 install -r requirements.txt
-```
-
 ## Run
 ```bash
-python3 app.py
+cd ~/Vibration-Table-Controller
+source venv/bin/activate
+python app.py
 ```
 
 ## Autostart (systemd)
@@ -34,9 +27,9 @@ sudo systemctl start vibration-controller
 ```
 
 ## USB export
-- Plug in a USB stick. It should auto-mount under `/media/pi/<label>` 
+- Plug in a USB drive to one of the Raspberry Pi ports. It should auto-mount under `/media/pi/<label>` 
 - Press **Export** in the UI, select your mount, and the app should copy the current CSV log and a PNG plot SS.
 
 ## Calibration
 Adjust values in vtc/config.py.
-Use the Loopback Calibration routine to compute effective gain/scale for your DAC/ADC chain.
+Use the Loopback Calibration routine to compute effective gain/scale for the DAC/ADC chain.
