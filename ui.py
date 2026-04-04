@@ -303,17 +303,17 @@ class VTCApp:
 
     def _on_start(self):
     # Only allow if armed and no fault
-    if self.safety.is_fault():
-        self._set_status("FAULT")
-        self.running = False
-    elif not getattr(self.safety, "armed", False):
-        self._set_status("MUTED")
-        self.running = False
-    else:
-        self.running = True
-        self.t0 = time.time()
-        self._set_status("RUNNING")
-    self._update_status_labels()
+        if self.safety.is_fault():
+            self._set_status("FAULT")
+            self.running = False
+        elif not getattr(self.safety, "armed", False):
+            self._set_status("MUTED")
+            self.running = False
+        else:
+            self.running = True
+            self.t0 = time.time()
+            self._set_status("RUNNING")
+            self._update_status_labels()
 
     def _on_stop(self):
         self.running = False
