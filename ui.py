@@ -18,7 +18,7 @@ from export_utils import list_usb_mounts, export_files
 class WaveformOutputWorker:
     """
     High-rate waveform output loop, separate from the Qt GUI timer.
-    This reduces timing jitter and makes the DAC output much smoother.
+    This helps with timing jitter and makes the DAC output much smoother.
     """
 
     def __init__(self, dac, sample_hz=5000):
