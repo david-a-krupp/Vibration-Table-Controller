@@ -16,5 +16,6 @@ class GPIOPins:
 
 @dataclass
 class Runtime:
-    SAMPLE_HZ: int = 500
-    LOG_PATH: str = str((Path.home() / "vtc_logs"))
+    SAMPLE_HZ: int = 5000
+    GUI_HZ: int = 50
+    LOG_PATH: str = str(Path.home() / "vtc_logs")
