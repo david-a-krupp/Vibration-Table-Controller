@@ -2,8 +2,9 @@
 import sys
 import time
 import os
+import threading
 
-from PyQt5 import QtWidgets, QtCore, QtGui
+from PyQt5 import QtWidgets, QtCore
 import pyqtgraph as pg
 
 from config import Calibration, GPIOPins, Runtime
@@ -14,65 +15,200 @@ from logging_utils import CSVLogger
 from export_utils import list_usb_mounts, export_files
 
 
+class WaveformOutputWorker:
+    """
+    High-rate waveform output loop, separate from the Qt GUI timer.
+    This reduces timing jitter and makes the DAC output much smoother.
+    """
+
+    def __init__(self, dac, sample_hz=5000):
+        self.dac = dac
+        self.sample_hz = max(1, int(sample_hz))
+        self.dt = 1.0 / self.sample_hz
+
+        self.running = False
+        self.thread = None
+        self.lock = threading.Lock()
+
+        self.start_time = None
+        self.last_command = 0.0
+
+        self.mode = "Manual"
+        self.params = {
+            "manual": 2.5,
+            "amp": 2.0,
+            "freq": 10.0,
+            "dc": 2.5,
+            "f_start": 0.5,
+            "f_end": 50.0,
+            "dur": 10.0,
+            "noise": 0.2,
+            "shock_t0": 1.0,
+            "shock_peak": 4.5,
+            "shock_tau": 0.02,
+        }
+
+        self.cal = Calibration()
+
+    def update_settings(self, mode, params, cal):
+        with self.lock:
+            self.mode = str(mode)
+            self.params = dict(params)
+            self.cal = cal
+
+    def start(self):
+        if self.running:
+            return
+        self.running = True
+        self.start_time = time.perf_counter()
+        self.thread = threading.Thread(target=self._run, daemon=True)
+        self.thread.start()
+
+    def stop(self):
+        self.running = False
+        if self.thread is not None:
+            self.thread.join(timeout=1.0)
+            self.thread = None
+        try:
+            self.dac.write(0.0)
+        except Exception:
+            pass
+        self.last_command = 0.0
+
+    def get_last_command(self):
+        with self.lock:
+            return float(self.last_command)
+
+    def _compute_cmd_voltage(self, mode, t, p):
+        if mode == "Manual":
+            return wf.manual(p["manual"])
+
+        if mode == "Sine":
+            return wf.sine(t, amp=p["amp"], freq_hz=p["freq"], dc=p["dc"])
+
+        if mode == "Sine Sweep":
+            return wf.sine_sweep(
+                t,
+                amp=p["amp"],
+                f_start=p["f_start"],
+                f_end=p["f_end"],
+                dur=p["dur"],
+                dc=p["dc"],
+            )
+
+        if mode == "Random Noise":
+            return wf.random_noise(dc=p["dc"], std=p["noise"])
+
+        if mode == "Sine on Random":
+            return wf.sine_on_random(
+                t,
+                amp_sine=p["amp"],
+                freq_hz=p["freq"],
+                dc=p["dc"],
+                rand_std=p["noise"],
+            )
+
+        if mode == "Resonance Dwell":
+            return wf.resonance_dwell(t, amp=p["amp"], freq_hz=p["freq"], dc=p["dc"])
+
+        if mode == "Shock":
+            return wf.shock(
+                t,
+                t0=p["shock_t0"],
+                peak=p["shock_peak"],
+                dc=p["dc"],
+                tau=p["shock_tau"],
+            )
+
+        return wf.manual(p["dc"])
+
+    def _run(self):
+        next_tick = time.perf_counter()
+
+        while self.running:
+            with self.lock:
+                mode = self.mode
+                p = dict(self.params)
+                cal = self.cal
+
+            t = time.perf_counter() - self.start_time
+            cmd_v = self._compute_cmd_voltage(mode, t, p)
+
+            out_v = cal.DAC_OFFSET + cal.DAC_SCALE * cmd_v
+            out_v = max(0.0, min(5.0, out_v))
+
+            try:
+                self.dac.write(out_v)
+            except Exception:
+                self.running = False
+                break
+
+            with self.lock:
+                self.last_command = out_v
+
+            next_tick += self.dt
+            sleep_time = next_tick - time.perf_counter()
+
+            if sleep_time > 0:
+                time.sleep(sleep_time)
+            else:
+                next_tick = time.perf_counter()
+
+        try:
+            self.dac.write(0.0)
+        except Exception:
+            pass
+
+
 class VTCApp:
     """
     Main Qt application for the Vibration Table Controller.
-
-    Responsibilities:
-    - Connect to the MCC USB-1208FS-Plus (AO for drive, AI for feedback)
-    - Provide waveform selection and parameter controls
-    - Implement a simple safety state machine (MUTED / ARMED / RUNNING)
-    - Plot command vs measured voltage in real time
-    - Log data to CSV and export CSV + plot PNG to a USB drive
     """
 
     def __init__(self):
-        # One QApplication for the whole program
         self.app = QtWidgets.QApplication(sys.argv)
 
-        # Config / calibration
         self.cal = Calibration()
         self.gpio = GPIOPins()
         self.rt = Runtime()
 
-        # Hardware interfaces
-        # Assumes dac_uldaq.DacULDAQ has AO + AI (with .write() and .read())
-        self.dac = DacULDAQ()  # uses defaults: AO0 / AI0
+        self.dac = DacULDAQ()
         self.dac.connect()
 
-        # Safety controller (may be GPIO-based, or a software stub)
         self.safety = SafetyController(
             estop_pin=self.gpio.ESTOP_PIN,
             mute_pin=self.gpio.MUTE_PIN,
         )
 
-        # Logging
         self.logger = CSVLogger(self.rt.LOG_PATH)
 
-        # Timebase
         self.sample_hz = int(self.rt.SAMPLE_HZ)
-        self.dt = 1.0 / max(self.sample_hz, 1)
-        self.t0 = None
+        self.gui_hz = max(1, int(self.rt.GUI_HZ))
+        self.gui_dt_ms = int(1000 / self.gui_hz)
 
-        # State
         self.running = False
+        self.t0 = None
         self.last_t = 0.0
+        self._status = "INIT"
 
-        # Data buffers for plot
+        self.output_params = {}
+        self.output_worker = WaveformOutputWorker(
+            dac=self.dac,
+            sample_hz=self.sample_hz,
+        )
+
         self.xdata = []
         self.ycmd = []
         self.ymeas = []
         self.max_points = 3000
 
-        # Build UI
         self._build_ui()
+        self._refresh_output_settings()
+        self._update_status_labels()
 
-        # Timer for real-time updates
         self.timer = QtCore.QTimer()
         self.timer.timeout.connect(self._update)
-        self.timer.start(int(1000 * self.dt))
-
-    # UI layout
+        self.timer.start(self.gui_dt_ms)
 
     def _build_ui(self):
         self.win = QtWidgets.QMainWindow()
@@ -84,7 +220,6 @@ class VTCApp:
 
         layout = QtWidgets.QVBoxLayout(central)
 
-        # Top bar: safety and status
         top_bar = QtWidgets.QHBoxLayout()
 
         self.lbl_status = QtWidgets.QLabel("Status: INIT")
@@ -110,12 +245,9 @@ class VTCApp:
 
         layout.addLayout(top_bar)
 
-        # Waveform controls
         controls = QtWidgets.QGridLayout()
-
         row = 0
 
-        # Mode
         controls.addWidget(QtWidgets.QLabel("Mode:"), row, 0)
         self.cmb_mode = QtWidgets.QComboBox()
         self.cmb_mode.addItems([
@@ -130,7 +262,6 @@ class VTCApp:
         controls.addWidget(self.cmb_mode, row, 1, 1, 2)
         row += 1
 
-        # Manual value
         self.lbl_manual = QtWidgets.QLabel("Manual V:")
         self.spin_manual = QtWidgets.QDoubleSpinBox()
         self.spin_manual.setRange(0.0, 5.0)
@@ -140,7 +271,6 @@ class VTCApp:
         controls.addWidget(self.spin_manual, row, 1)
         row += 1
 
-        # Common sine parameters
         self.lbl_amp = QtWidgets.QLabel("Amplitude (V):")
         self.spin_amp = QtWidgets.QDoubleSpinBox()
         self.spin_amp.setRange(0.0, 5.0)
@@ -169,7 +299,6 @@ class VTCApp:
         controls.addWidget(self.spin_dc, row, 1)
         row += 1
 
-        # Sweep-specific
         self.lbl_fstart = QtWidgets.QLabel("Sweep f_start (Hz):")
         self.spin_fstart = QtWidgets.QDoubleSpinBox()
         self.spin_fstart.setRange(0.01, 50.0)
@@ -198,7 +327,6 @@ class VTCApp:
         controls.addWidget(self.spin_dur, row, 1)
         row += 1
 
-        # Noise / shock params
         self.lbl_noise = QtWidgets.QLabel("Noise std (V):")
         self.spin_noise = QtWidgets.QDoubleSpinBox()
         self.spin_noise.setRange(0.0, 2.0)
@@ -237,7 +365,6 @@ class VTCApp:
 
         layout.addLayout(controls)
 
-        # Start/stop and export buttons
         btn_row = QtWidgets.QHBoxLayout()
 
         self.btn_start = QtWidgets.QPushButton("Start")
@@ -259,13 +386,11 @@ class VTCApp:
 
         layout.addLayout(btn_row)
 
-        # Plot area
         self.plot = pg.PlotWidget()
         self.plot.setLabel("bottom", "Time", units="s")
         self.plot.setLabel("left", "Voltage", units="V")
         self.plot.showGrid(x=True, y=True, alpha=0.3)
 
-        # Two curves: command and measured
         self.curve_cmd = self.plot.plot(pen=pg.mkPen(width=2))
         self.curve_meas = self.plot.plot(
             pen=pg.mkPen(style=QtCore.Qt.DashLine, width=2)
@@ -277,47 +402,75 @@ class VTCApp:
 
         layout.addWidget(self.plot, stretch=1)
 
-        # Measurements label
         self.lbl_meas = QtWidgets.QLabel("Meas: 0.000 V, 0.000 g")
         layout.addWidget(self.lbl_meas)
 
-        # Initialize state labels
-        self._update_status_labels()
+    def _collect_output_params(self):
+        return {
+            "manual": self.spin_manual.value(),
+            "amp": self.spin_amp.value(),
+            "freq": self.spin_freq.value(),
+            "dc": self.spin_dc.value(),
+            "f_start": self.spin_fstart.value(),
+            "f_end": self.spin_fend.value(),
+            "dur": self.spin_dur.value(),
+            "noise": self.spin_noise.value(),
+            "shock_t0": self.spin_t0.value(),
+            "shock_peak": self.spin_peak.value(),
+            "shock_tau": self.spin_tau.value(),
+        }
 
-    # Event handlers
+    def _refresh_output_settings(self):
+        self.output_params = self._collect_output_params()
+        self.output_worker.update_settings(
+            mode=self.cmb_mode.currentText(),
+            params=self.output_params,
+            cal=self.cal,
+        )
 
     def _on_arm(self):
         status = self.safety.arm()
         if status == "ARMED":
             self._set_status("ARMED")
         else:
-            # Could not arm, probably because of external fault
             self._set_status("FAULT")
         self._update_status_labels()
 
     def _on_mute(self):
-        self.safety.mute()
+        self.output_worker.stop()
         self.running = False
+        self.safety.mute()
         self._set_status("MUTED")
         self._update_status_labels()
 
     def _on_start(self):
-    # Only allow if armed and no fault
         if self.safety.is_fault():
             self._set_status("FAULT")
             self.running = False
-        elif not getattr(self.safety, "armed", False):
+            self._update_status_labels()
+            return
+
+        if not getattr(self.safety, "armed", False):
             self._set_status("MUTED")
             self.running = False
-        else:
-            self.running = True
-            self.t0 = time.time()
-            self._set_status("RUNNING")
             self._update_status_labels()
+            return
+
+        self._refresh_output_settings()
+        self.t0 = time.perf_counter()
+        self.running = True
+        self.output_worker.start()
+        self._set_status("RUNNING")
+        self._update_status_labels()
 
     def _on_stop(self):
+        self.output_worker.stop()
         self.running = False
-        self.dac.write(0.0)
+        try:
+            self.dac.write(0.0)
+        except Exception:
+            pass
+
         if getattr(self.safety, "armed", False):
             self._set_status("ARMED")
         else:
@@ -325,10 +478,6 @@ class VTCApp:
         self._update_status_labels()
 
     def _on_export(self):
-        """
-        Export current CSV log and a PNG screenshot of the plot
-        to a selected USB mount.
-        """
         mounts = list_usb_mounts()
         if not mounts:
             QtWidgets.QMessageBox.warning(
@@ -346,7 +495,6 @@ class VTCApp:
 
         dest = item
 
-        # Save a PNG screenshot of the plot to the log folder
         png_path = os.path.splitext(self.logger.path)[0] + ".png"
         pixmap = self.plot.grab()
         pixmap.save(png_path)
@@ -357,53 +505,34 @@ class VTCApp:
             self.win, "Export", f"Exported {len(exported)} file(s) to {dest}"
         )
 
-    # Core update loop
-
     def _update(self):
-        # Safety fault check
+        self._refresh_output_settings()
+
         fault = self.safety.is_fault()
         self.lbl_fault.setText(f"Fault: {'YES' if fault else 'NO'}")
 
         if fault:
-            # Hard mute if fault occurs
+            self.output_worker.stop()
             self.running = False
-            self.dac.write(0.0)
             self._set_status("FAULT")
             self._update_status_labels()
             return
 
         if not self.running:
-            # Ensure output is muted when not running
-            self.dac.write(0.0)
+            try:
+                self.dac.write(0.0)
+            except Exception:
+                pass
             return
 
         if self.t0 is None:
-            self.t0 = time.time()
+            self.t0 = time.perf_counter()
 
-        t = time.time() - self.t0
+        t = time.perf_counter() - self.t0
         self.last_t = t
 
-        # Determine command voltage from selected waveform
-        mode = self.cmb_mode.currentText()
-        cmd_v = self._compute_cmd_voltage(mode, t)
+        out_v = self.output_worker.get_last_command()
 
-        # Apply DAC calibration
-        out_v = self.cal.DAC_OFFSET + self.cal.DAC_SCALE * cmd_v
-
-        # Clamp in software to 0–5 V (MCC UNI5VOLTS)
-        out_v = max(0.0, min(5.0, out_v))
-
-        # Send to hardware
-        try:
-            self.dac.write(out_v)
-        except Exception:
-            # If something goes wrong, stop output
-            self.running = False
-            self._set_status("ERROR")
-            self._update_status_labels()
-            return
-
-        # Read measurement from MCC AI through ADAM-3017
         meas_v = 0.0
         try:
             raw_v = self.dac.read()
@@ -413,7 +542,6 @@ class VTCApp:
 
         meas_g = meas_v * self.cal.G_PER_V
 
-        # Append to buffers
         self.xdata.append(t)
         self.ycmd.append(out_v)
         self.ymeas.append(meas_v)
@@ -423,81 +551,28 @@ class VTCApp:
             self.ycmd = self.ycmd[-self.max_points:]
             self.ymeas = self.ymeas[-self.max_points:]
 
-        # Update plot
         self.curve_cmd.setData(self.xdata, self.ycmd)
         self.curve_meas.setData(self.xdata, self.ymeas)
 
-        # Update measurement label
         self.lbl_meas.setText(f"Meas: {meas_v:.3f} V, {meas_g:.3f} g")
 
-        # Log
         self.logger.write(t, out_v, meas_v)
-
-    # Helpers
-
-    def _compute_cmd_voltage(self, mode: str, t: float) -> float:
-        """Return uncalibrated command voltage based on mode and time."""
-        dc = self.spin_dc.value()
-        amp = self.spin_amp.value()
-        freq = self.spin_freq.value()
-
-        if mode == "Manual":
-            return wf.manual(self.spin_manual.value())
-
-        if mode == "Sine":
-            return wf.sine(t, amp=amp, freq_hz=freq, dc=dc)
-
-        if mode == "Sine Sweep":
-            return wf.sine_sweep(
-                t,
-                amp=amp,
-                f_start=self.spin_fstart.value(),
-                f_end=self.spin_fend.value(),
-                dur=self.spin_dur.value(),
-                dc=dc,
-            )
-
-        if mode == "Random Noise":
-            return wf.random_noise(dc=dc, std=self.spin_noise.value())
-
-        if mode == "Sine on Random":
-            return wf.sine_on_random(
-                t,
-                amp_sine=amp,
-                freq_hz=freq,
-                dc=dc,
-                rand_std=self.spin_noise.value(),
-            )
-
-        if mode == "Resonance Dwell":
-            return wf.resonance_dwell(t, amp=amp, freq_hz=freq, dc=dc)
-
-        if mode == "Shock":
-            return wf.shock(
-                t,
-                t0=self.spin_t0.value(),
-                peak=self.spin_peak.value(),
-                dc=dc,
-                tau=self.spin_tau.value(),
-            )
-
-        # Fallback
-        return wf.manual(dc)
 
     def _set_status(self, status: str):
         self._status = status
 
     def _update_status_labels(self):
-        status = getattr(self, "_status", "INIT")
-        self.lbl_status.setText(f"Status: {status}")
-
-    # Main entry point
+        self.lbl_status.setText(f"Status: {self._status}")
 
     def run(self):
         try:
             self.win.show()
             self.app.exec_()
         finally:
+            try:
+                self.output_worker.stop()
+            except Exception:
+                pass
             try:
                 self.dac.write(0.0)
             except Exception:
