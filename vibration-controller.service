@@ -1,14 +1,14 @@
 [Unit]
 Description=Vibration Table Controller
-After=network-online.target
+After=graphical.target
 
 [Service]
 Type=simple
-WorkingDirectory=/opt/vtc
-ExecStart=/usr/bin/python3 /opt/vtc/app.py
+WorkingDirectory=/home/pi/Vibration-Table-Controller
+ExecStart=/usr/bin/python3 /home/pi/Vibration-Table-Controller/app.py
 Restart=on-failure
 RestartSec=2
 
 [Install]
-WantedBy=multi-user.target
+WantedBy=graphical.target
 
